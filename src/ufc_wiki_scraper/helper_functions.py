@@ -13,8 +13,9 @@ def get_opponents(url):
     response = get(url) # getting the HTML file
     selector = Selector(response.text) # passing the HTML file
 
-    # addressing the rows of the table via xpath
-    table_rows = selector.xpath('//table[@class="wikitable"]/tbody/tr')
+    # addressing the rows of the opponent table via xpath
+    table = selector.xpath('//table[@class="wikitable"]')[0]
+    table_rows = table.xpath('./tbody/tr')
 
     opponents = []
     for row in table_rows[1:]:
@@ -29,6 +30,7 @@ def get_opponents(url):
         href = a[0].xpath("@href").get() if a else None
         name = a[0].xpath("./text()").get() if a else row.xpath("./td["
                "3]/text()").get()
+        print(name)
 
         # collect data together
         opponent = {
@@ -44,5 +46,27 @@ def get_opponents(url):
     return opponents
 
 def get_info(url):
-    print("GETTING INFORMATION...")
-    return {}
+    response = get(url)
+    selector = Selector(response.text)
+
+    # getting the info table's rows
+    table = selector.xpath('//table[@class="infobox vcard"]/tbody')[0]
+    table_rows = table.xpath("./tr")
+
+    # obtaining certain values
+    name = table.xpath('./tr[1]/th/span/text()').get()
+    image = table.xpath('./tr[2]/td/span/a/@href').get()
+
+    info = {
+        "name": name,
+        "image": "https://en.wikipedia.org" + str(image)
+    }
+
+    for row in table_rows[2:12]:
+        th = row.xpath("./th/text()").get().lower()
+        td = row.xpath("./td//text()").getall()
+        info[th] = ''.join(td).strip().replace('\u00a0', ' ').replace(
+            '\u2013', '-')
+
+    # collecting the data together
+    return info
