@@ -2,6 +2,7 @@
 from requests import get
 from parsel import Selector
 import re
+import dateparser
 
 # Returns the appropriate function for the handler assignment.
 def get_handler(choice):
@@ -11,6 +12,8 @@ def get_handler(choice):
         return get_info
     if choice == "ops+info":
         return get_ops_with_info
+    if choice == "deep-ops":
+        return get_deep_ops
 
 def get_opponents(url):
     response = get(url) # getting the HTML file
@@ -43,7 +46,7 @@ def get_opponents(url):
                 href),
             "outcome": outcome.strip("\n"),
             "method": method.strip('\n'),
-            "date": date,
+            "date": str(dateparser.parse(date)),
             "record": record.replace("\u2013", "-").strip("\n"),
         }
         opponents.append(opponent)
@@ -73,7 +76,15 @@ def get_info(url):
 
         if key is None or value is None:
             continue # so that this loop does never crash
-
+        if key.startswith("Born"):
+            pattern = " <\/span>(?P<date>[\w ,]+)<span "
+            match = re.search(pattern, row.xpath("./td").get())
+            if match is None:
+                info["born"] = None
+                continue
+            info["born"] = {
+                "date": str(dateparser.parse(match.group("date")))
+            }
         if key.startswith("Nickname"):
             info["nickname"] = value
         elif key.startswith("Nationality"):
@@ -119,3 +130,19 @@ def get_ops_with_info(url):
             info = get_info(link)
         op["info"] = info
     return ops
+
+def get_deep_ops(url):
+    ultimate_opponents = []
+    ops = get_opponents(url)
+    ultimate_opponents.append({
+        "url": url,
+        "ops": ops
+    })
+    for op in ops:
+        if link := op.get("url"):
+            addition = get_opponents(link)
+            ultimate_opponents.append({
+                "url": link,
+                "ops": addition
+            })
+    return ultimate_opponents
